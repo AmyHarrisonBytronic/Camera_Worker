@@ -1,12 +1,15 @@
 from MQTT_Objects.Classes.mqtt_CameraClass import CameraClass
+from Dependencies import loadConfig
 import time
 import asyncio
 import threading
+import yaml
 
-IP = "localhost"
-PORT = 1883
-TRIGGER_TOPIC = "trigger/status"
-PUBLISH_TOPIC = "camera/image"
+IP = loadConfig.return_config_value("ip")
+PORT = loadConfig.return_config_value("port")
+TRIGGER_TOPIC = loadConfig.return_config_value("trigger_topic")
+PUBLISH_TOPIC = loadConfig.return_config_value("publish_topic")
+MESSAGE = loadConfig.return_config_value("message")
 
 def start_async_loop(loop):
     asyncio.set_event_loop(loop)
@@ -18,7 +21,7 @@ async def listen_for_capture(camera: CameraClass) -> bool:
 
     try:
         msg = await camera.ListenForMessage()
-        
+
     except Exception as e:
         print(f"Error occurred while listening for message: {e}")
         return False
