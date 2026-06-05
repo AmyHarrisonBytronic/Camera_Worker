@@ -1,4 +1,5 @@
 from MQTT_Objects.Classes.mqtt_CameraClass import CameraClass
+from MQTT_Objects.Classes.mqtt_Camera_PylonClass import PylonClass
 import cv2
 from Dependencies import loadConfig
 import time
@@ -15,7 +16,7 @@ def start_async_loop(loop):
     asyncio.set_event_loop(loop)
     loop.run_forever()
 
-async def listen_for_capture(camera: CameraClass) -> bool:
+async def listen_for_capture(camera: PylonClass) -> bool:
     # This function waits for a capture request to be sent from the broker and then triggers the camera to capture an image.
     # it returns a boolean value indicating whether the capture was received or not.
 
@@ -33,7 +34,7 @@ async def listen_for_capture(camera: CameraClass) -> bool:
     return False
 
 def main():
-    camera = CameraClass()
+    camera = PylonClass()
     camera.ConnectToCamera()
     camera.ConnectToServer(IP, PORT)
     camera.SubscribeToTopic(TRIGGER_TOPIC)
