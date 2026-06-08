@@ -4,6 +4,8 @@ import time
 import threading
 from queue import Empty, Queue
 from MQTT_Objects.Classes.mqttClass import mqttClass
+from MQTT_Objects.Classes.mqtt_Camera_PylonClass import PylonClass
+from MQTT_Objects.Classes.mqtt_CameraClass import CameraClass
 
 IP = loadConfig.return_config_value("ip")
 PORT = loadConfig.return_config_value("port")
@@ -18,13 +20,11 @@ def set_camera_class(camera_type: str):
         raise ValueError("Camera type cannot be empty.")
     
     if camera_type == "opencv":
-        from MQTT_Objects.Classes.mqtt_CameraClass import CameraClass
         camera = CameraClass()
         camera.ConnectToCamera()
         return camera
 
     if camera_type == "pylon":
-        from MQTT_Objects.Classes.mqtt_Camera_PylonClass import PylonClass
         camera = PylonClass()
         camera.ConnectToCamera()
         return camera
