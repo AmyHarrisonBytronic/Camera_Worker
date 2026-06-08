@@ -3,3 +3,4 @@ port: 1883
 trigger_topic: magnapower/sortyboi/inference*/trigger
 image_topic: magnapower/sortyboi/camer1/image
 message: null
+camera_type: pylon

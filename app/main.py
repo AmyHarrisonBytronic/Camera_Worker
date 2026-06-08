@@ -1,5 +1,3 @@
-from MQTT_Objects.Classes.mqtt_CameraClass import CameraClass
-from MQTT_Objects.Classes.mqtt_Camera_PylonClass import PylonClass
 import cv2
 from Dependencies import loadConfig
 import time
@@ -11,6 +9,18 @@ PORT = loadConfig.return_config_value("port")
 TRIGGER_TOPIC = loadConfig.return_config_value("trigger_topic")
 IMAGE_TOPIC = loadConfig.return_config_value("image_topic")
 MESSAGE = loadConfig.return_config_value("message")
+CAMERA_TYPE = loadConfig.return_config_value("camera_type")
+
+def set_camera_class(camera_type: str):
+    if not camera_type:
+        raise ValueError("Camera type cannot be empty.")
+    if camera_type == "opencv":
+        return cv2.VideoCapture(0)
+    if camera_type == "pylon":
+        from MQTT_Objects.Classes.mqtt_Camera_PylonClass import PylonClass
+        return PylonClass()
+    else:
+        raise ValueError(f"Unsupported camera type: {camera_type}")
 
 def start_async_loop(loop):
     asyncio.set_event_loop(loop)
@@ -34,7 +44,7 @@ async def listen_for_capture(camera: PylonClass) -> bool:
     return False
 
 def main():
-    camera = PylonClass()
+    camera = set_camera_class(CAMERA_TYPE)
     camera.ConnectToCamera()
     camera.ConnectToServer(IP, PORT)
     camera.SubscribeToTopic(TRIGGER_TOPIC)
