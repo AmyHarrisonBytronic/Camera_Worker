@@ -1,17 +1,25 @@
 import cv2
 
 class Camera:
-    def __init__(self, camera_type: str):
-        self.camera = self.set_camera_class(camera_type)
+    def __init__(self):
+        self.camera = None
 
     def connect_to_camera(self):        
         """ Connect to the camera based on the specified camera type.
         Raises:
             Exception: If the camera type is unsupported or if connection fails."""
-        camera =  cv2.VideoCapture(0)
-        if not camera is None:
+        # Open the default OpenCV camera and store on the instance so
+        # subsequent calls to `capture_image` can use the same handle.
+        self.camera = cv2.VideoCapture(0)
+        if not getattr(self.camera, "isOpened", lambda: False)():
+            # Ensure camera resources are released if open failed
+            try:
+                self.camera.release()
+            except Exception:
+                pass
+            self.camera = None
             raise Exception("Failed to open OpenCV camera.")
-        return camera
+        return self.camera
     
     def capture_image(self):
         """Capture an image from the camera and return it as a numpy array.
