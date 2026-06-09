@@ -3,9 +3,11 @@ from Dependencies import loadConfig
 import time
 import threading
 from queue import Empty, Queue
-from MQTT_Objects.Classes.mqttClass import mqttClass
-from MQTT_Objects.Classes.mqtt_Camera_PylonClass import PylonClass
-from MQTT_Objects.Classes.mqtt_CameraClass import CameraClass
+import numpy as np
+
+from mqtt_client import MQTTClient, MQTTConfig
+from Dependencies.CameraLibrary.Cameras import Camera
+from Dependencies.CameraLibrary.PylonCamera import PylonCamera
 #
 IP = loadConfig.return_config_value("ip")
 PORT = loadConfig.return_config_value("port")
@@ -20,54 +22,46 @@ def set_camera_class(camera_type: str):
         raise ValueError("Camera type cannot be empty.")
     
     if camera_type == "opencv":
-        camera = CameraClass()
-        camera.ConnectToCamera()
-        return camera
-
-    if camera_type == "pylon":
-        camera = PylonClass()
-        camera.ConnectToCamera()
-        return camera
+        camera = Camera()
+    elif camera_type == "pylon":
+        camera = PylonCamera()
     else:
         raise ValueError(f"Unsupported camera type: {camera_type}")
     
-def capture_image(camera):
-    if isinstance(camera, cv2.VideoCapture):
-        ret, frame = camera.read()
-        if not ret:
-            raise Exception("Failed to capture image from OpenCV camera.")
-        return frame
-    elif isinstance(camera, PylonClass):
-        return camera.GetImageFromCamera()
-    else:
-        raise ValueError("Unsupported camera object type.")
+    camera.connect_to_camera()
+    return camera
 
 def subscribe_listener(ip: str, port: int, trigger_topic: str, result_queue: Queue, stop_event: threading.Event):
-    mqtt_listener = mqttClass()
-    mqtt_listener.ConnectToServer(ip, port)
-    mqtt_listener.SubscribeToTopic(trigger_topic)
+    config = MQTTConfig(host=IP, port=PORT)
+    client = MQTTClient(config)
+    client.connect()
 
-    def on_message(client, userdata, msg):
+    def on_message(topic: str, payload: str) -> None:
+        # Handler signature used by mqtt_client.MQTTClient.subscribe
         try:
-            payload = msg.payload.decode("utf-8")
+            decoded = payload
         except Exception:
-            payload = msg.payload
-        print("Capture request received:", msg.topic)
-        result_queue.put(payload)
+            decoded = payload
+        print("Capture request received:", topic)
+        result_queue.put(decoded)
 
-    mqtt_listener.client.on_message = on_message
-    mqtt_listener.client.loop_start()
+    client.subscribe(trigger_topic, on_message)
 
-    try:
-        while not stop_event.is_set():
-            time.sleep(0.1)
-    finally:
-        mqtt_listener.client.loop_stop()
-        try:
-            mqtt_listener.client.disconnect()
-        except Exception:
-            pass
+def encode_image_to_bytes(image: np.ndarray) -> bytes:
+    # Encode the image as JPEG and return the bytes
+    if image is None:
+        raise ValueError("Input image is None.")
+    if not isinstance(image, np.ndarray):
+        raise ValueError("Input image must be a numpy array.")
+    
+    success, encoded_image = cv2.imencode('.jpg', image)
+    if not success:
+        raise RuntimeError("Failed to encode image to JPEG format.")
+    return encoded_image.tobytes()
 
+def encode_date_time_to_bytes() -> bytes:
+    date_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    return date_time.encode("utf-8")
 
 def start_subscribe_thread(ip: str, port: int, topic: str, queue: Queue, stop_event: threading.Event) -> threading.Thread:
     thread = threading.Thread(
@@ -80,10 +74,10 @@ def start_subscribe_thread(ip: str, port: int, topic: str, queue: Queue, stop_ev
 
 def main():
     camera = set_camera_class(CAMERA_TYPE)
-    camera.ConnectToServer(IP, PORT)
 
-    mqtt = mqttClass()
-    mqtt.ConnectToServer(IP, PORT)
+    config = MQTTConfig(host=IP, port=PORT)
+    client = MQTTClient(config)
+    client.connect()
 
     event_queue = Queue()
     stop_event = threading.Event()
@@ -102,22 +96,25 @@ def main():
                 print("Received invalid trigger payload; ignoring.")
                 continue
 
-            date_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            mqtt.PublishMessage(TRIGGER_TIME_TOPIC, date_time.encode("utf-8"))
+            date_time = encode_date_time_to_bytes()
+
             print("Capturing image...")
-            image = camera.GetImageFromCamera()
-            image = cv2.resize(image, (1920, 1080))
+            image = camera.capture_image()
+
+            image_bytes = encode_image_to_bytes(image)
+            packet = image_bytes#+date_time
 
             print("Publishing image...")
             if image is not None:
                 try:
-                    camera.PublishMessage(IMAGE_TOPIC, image)
+                    client.publish(IMAGE_TOPIC, packet)
                 except Exception as e:
                     print(f"Error publishing image: {e}")
             else:
                 print("Failed to capture image.")
 
             print("Image published. Waiting for next capture request...")
+
     except KeyboardInterrupt:
         print("Shutting down subscribe listener and exiting.")
     finally:
