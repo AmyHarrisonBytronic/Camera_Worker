@@ -8,6 +8,8 @@ import numpy as np
 from mqtt_client import MQTTClient, MQTTConfig
 from Dependencies.CameraLibrary.Cameras import Camera
 from Dependencies.CameraLibrary.PylonCamera import PylonCamera
+import logging
+import os
 #
 IP = loadConfig.return_config_value("ip")
 PORT = loadConfig.return_config_value("port")
@@ -16,6 +18,21 @@ IMAGE_TOPIC = loadConfig.return_config_value("image_topic")
 TRIGGER_TIME_TOPIC = loadConfig.return_config_value("trigger_time_topic")
 MESSAGE = loadConfig.return_config_value("message")
 CAMERA_TYPE = loadConfig.return_config_value("camera_type")
+LOGGING_FILE = f'./logs/{CAMERA_TYPE}_worker{time.strftime("%Y%m%d")}.log'
+#check if dio.log exists
+
+if not os.path.exists(LOGGING_FILE):
+    file = open(LOGGING_FILE,"w")
+    file.write("")
+    file.close()
+
+logging.basicConfig(
+    filename=LOGGING_FILE,
+    level=logging.INFO,
+    format='%(asctime)s - [PID %(process)d] - %(levelname)s - %(message)s',
+    force=True,  # Force configuration even if the logger was previously configured
+    filemode='a'  # Append mode instead of overwrite
+)
 
 def set_camera_class(camera_type: str):
     if not camera_type:
@@ -42,7 +59,7 @@ def subscribe_listener(ip: str, port: int, trigger_topic: str, result_queue: Que
             decoded = payload
         except Exception:
             decoded = payload
-        print("Capture request received:", topic)
+        #logging.log(f"Capture request received: {trigger_topic}")
         result_queue.put(decoded)
 
     client.subscribe(trigger_topic, on_message)
@@ -93,30 +110,30 @@ def main():
                 continue
 
             if msg is None:
-                print("Received invalid trigger payload; ignoring.")
+                logging.info("Received invalid trigger payload; ignoring.")
                 continue
 
             date_time = encode_date_time_to_bytes()
 
-            print("Capturing image...")
+            logging.info("Capturing image...")
             image = camera.capture_image()
 
             image_bytes = encode_image_to_bytes(image)
             packet = image_bytes#+date_time
 
-            print("Publishing image...")
+            logging.info("Publishing image...")
             if image is not None:
                 try:
                     client.publish(IMAGE_TOPIC, packet)
                 except Exception as e:
-                    print(f"Error publishing image: {e}")
+                    logging.log(f"Error publishing image: {e}")
             else:
-                print("Failed to capture image.")
+                logging.info("Failed to capture image.")
 
-            print("Image published. Waiting for next capture request...")
+            logging.info("Image published. Waiting for next capture request...")
 
     except KeyboardInterrupt:
-        print("Shutting down subscribe listener and exiting.")
+        logging.info("Shutting down subscribe listener and exiting.")
     finally:
         stop_event.set()
         if subscribe_thread.is_alive():
