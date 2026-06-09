@@ -1,11 +1,11 @@
 from pypylon import pylon
 import numpy as np
-import Cameras
+from .Cameras import Camera
 import time
 
-class PylonCamera(Cameras):
+class PylonCamera(Camera):
     def __init__(self):
-        super().__init__("pylon")
+        super().__init__()
 
     def _find_camera(self) -> pylon.InstantCamera:
         #find the first available camera and return it
