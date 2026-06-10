@@ -10,6 +10,7 @@ from Dependencies.CameraLibrary.Cameras import Camera
 from Dependencies.CameraLibrary.PylonCamera import PylonCamera
 import logging
 import os
+from sys import getsizeof
 #
 IP = loadConfig.return_config_value("ip")
 PORT = loadConfig.return_config_value("port")
@@ -72,6 +73,7 @@ def encode_image_to_bytes(image: np.ndarray) -> bytes:
         raise ValueError("Input image must be a numpy array.")
     
     success, encoded_image = cv2.imencode('.jpg', image)
+
     if not success:
         raise RuntimeError("Failed to encode image to JPEG format.")
     return encoded_image.tobytes()
@@ -119,7 +121,8 @@ def main():
             image = camera.capture_image()
 
             image_bytes = encode_image_to_bytes(image)
-            packet = image_bytes#+date_time
+            packet = image_bytes+date_time
+            print(packet[getsizeof(packet)-52:])
 
             logging.info("Publishing image...")
             if image is not None:
